@@ -10,7 +10,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.visitor.client.VisitorClient;
-import org.visitor.client.VisitorClientMockUpImpl;
+import org.visitor.client.VisitorClientImpl;
+import org.visitor.parser.DataParser;
+import org.visitor.parser.XMLDataParser;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.name.Names;
@@ -24,8 +26,9 @@ public class VisitorModule extends AbstractModule {
 		 
 			Properties configProperty = loadProperties("config.properties");
 			Names.bindProperties(binder(),configProperty);
-			bind(VisitorClient.class).to(VisitorClientMockUpImpl.class);
-		 	//bind(VisitorClient.class).to(VisitorClientImpl.class);
+			//bind(VisitorClient.class).to(VisitorClientMockUpImpl.class);
+		 	bind(VisitorClient.class).to(VisitorClientImpl.class);
+		 	bind(DataParser.class).to(XMLDataParser.class);
 	    }
 	 
 	private static Properties loadProperties(String path){

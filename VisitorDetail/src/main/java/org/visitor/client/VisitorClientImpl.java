@@ -31,137 +31,49 @@ import javax.xml.transform.stream.StreamSource;
 import org.visitor.bean.CountryBean;
 import org.visitor.bean.VisitorBean;
 import org.visitor.bean.VisitorInfoBean;
-import org.visitor.core.CountriesInfo;
 import org.visitor.core.VisitorInfo;
 import org.visitor.core.VisitorsInfo;
 import org.visitor.exception.DataFetchException;
+import org.visitor.parser.DataParser;
+
+import com.google.inject.Inject;
 
 public class VisitorClientImpl implements VisitorClient {
 
-	
-	private final static Logger logger = Logger.getLogger(VisitorClientImpl.class.getName()); 
-	
+	private final static Logger logger = Logger
+			.getLogger(VisitorClientImpl.class.getName());
+
 	public static final String COUNTRIES_URL = "http://www.thomas-bayer.com/restnames/countries.groovy";
 	public static final String VISITORS_URL = "http://www.thomas-bayer.com:80/restnames/namesincountry.groovy";
 	public static final String VISITOR_INFO_URL = "http://www.thomas-bayer.com:80/restnames/name.groovy";
 
+	@Inject
+	private DataParser dataParser;
 
 	@Override
 	public List<CountryBean> getCountryList() throws DataFetchException {
-		try {
-			String xmlStr = fetchData(COUNTRIES_URL);
-			List<CountryBean> countriesList = new ArrayList<CountryBean>();
-			if (xmlStr != null) {
-				JAXBContext jaxbContext = JAXBContext
-						.newInstance(CountriesInfo.class);
-				Unmarshaller jaxbUnmarshaller = jaxbContext
-						.createUnmarshaller();
-				CountriesInfo restnames = (CountriesInfo) jaxbUnmarshaller
-						.unmarshal(new StreamSource(new StringReader(xmlStr
-								.toString())));
-				if (restnames != null && restnames.getCountries() != null
-						&& restnames.getCountries().getCountry() != null) {
-					List<CountriesInfo.Countries.Country> countryList = restnames
-							.getCountries().getCountry();
-					for (CountriesInfo.Countries.Country country : countryList) {
-						if (country != null) {
-							countriesList.add(new CountryBean(
-									country.getHref(), country.getValue()));
-						}
-					}
-				}
-			}
-			return countriesList;
-		} catch (JAXBException e) {
-			e.printStackTrace();
-			throw new DataFetchException("Invalid Data is being returned");
-		}
+		String xmlStr = fetchData(COUNTRIES_URL);
+		return dataParser.parseCountryList(xmlStr);
 
 	}
 
 	@Override
 	public List<VisitorBean> getVisitorList(String countryURL)
 			throws DataFetchException {
-		try {
-			String xmlStr = fetchData(countryURL);
-			List<VisitorBean> visitorsList = new ArrayList<VisitorBean>();
-			if (xmlStr != null) {
-				JAXBContext jaxbContext = JAXBContext
-						.newInstance(VisitorsInfo.class);
-				Unmarshaller jaxbUnmarshaller = jaxbContext
-						.createUnmarshaller();
-				VisitorsInfo restnames = (VisitorsInfo) jaxbUnmarshaller
-						.unmarshal(new StreamSource(new StringReader(xmlStr
-								.toString())));
-				if (restnames != null && restnames.getNameinfo() != null
-						&& restnames.getNameinfo().getName() != null) {
-					List<VisitorsInfo.Nameinfo.Name> visitorList = restnames
-							.getNameinfo().getName();
-					for (VisitorsInfo.Nameinfo.Name visitor : visitorList) {
-						if (visitor != null) {
-							visitorsList.add(new VisitorBean(visitor.getHref(),
-									visitor.getValue()));
-						}
-					}
-				}
-			}
-			return visitorsList;
-		} catch (JAXBException e) {
-			e.printStackTrace();
-			throw new DataFetchException("Invalid Data is being returned");
-		}
-
+		String xmlStr = fetchData(countryURL);
+		return dataParser.parseVisitorList(xmlStr);
 	}
 
 	@Override
 	public VisitorInfoBean getVisitorInfo(String visitorURL)
 			throws DataFetchException {
-
-		try {
-			String xmlStr = fetchData(visitorURL);
-			VisitorInfoBean visitorInfo = new VisitorInfoBean();
-			if (xmlStr != null) {
-				JAXBContext jaxbContext = JAXBContext
-						.newInstance(VisitorInfo.class);
-				Unmarshaller jaxbUnmarshaller = jaxbContext
-						.createUnmarshaller();
-				VisitorInfo restnames = (VisitorInfo) jaxbUnmarshaller
-						.unmarshal(new StreamSource(new StringReader(xmlStr
-								.toString())));
-				if (restnames != null && restnames.getNameinfo() != null) {
-					visitorInfo.setName(restnames.getNameinfo().getName());
-					if ("true".equalsIgnoreCase(restnames.getNameinfo()
-							.getMale())) {
-						visitorInfo.setGender("Male");
-					} else if ("true".equalsIgnoreCase(restnames.getNameinfo()
-							.getFemale())) {
-						visitorInfo.setGender("Female");
-					}
-					if (restnames.getNameinfo().getCountries() != null
-							&& restnames.getNameinfo().getCountries()
-									.getCountry() != null) {
-						List<VisitorInfo.Nameinfo.Countries.Country> countryList = restnames
-								.getNameinfo().getCountries().getCountry();
-						for (VisitorInfo.Nameinfo.Countries.Country country : countryList) {
-							if (country != null) {
-								visitorInfo.getCountries().add(
-										new CountryBean(country.getHref(),
-												country.getValue()));
-							}
-						}
-					}
-				}
-			}
-			return visitorInfo;
-		} catch (JAXBException e) {
-			e.printStackTrace();
-			throw new DataFetchException("Invalid Data is being returned");
-		}
-
+		String xmlStr = fetchData(visitorURL);
+		return dataParser.parseVisitorInfo(xmlStr);
 	}
 
 	/**
-	 * Fetch the data restfully from particular  URL
+	 * Fetch the data restfully from particular URL
+	 * 
 	 * @param url
 	 * @return
 	 * @throws DataFetchException
@@ -172,7 +84,8 @@ public class VisitorClientImpl implements VisitorClient {
 		WebTarget target = client.target(encodeURL(url));
 		try {
 			Response response = target.request(MediaType.APPLICATION_XML).get();
-			logger.log(Level.INFO, "HTTP Response Status Code - " + response.getStatus());
+			logger.log(Level.INFO,
+					"HTTP Response Status Code - " + response.getStatus());
 			if (response.getStatus() != 200) {
 				throw new DataFetchException("Failed : HTTP error code : "
 						+ response.getStatus());
@@ -189,6 +102,7 @@ public class VisitorClientImpl implements VisitorClient {
 
 	/**
 	 * Main class written for testing purpose
+	 * 
 	 * @param args
 	 * @throws UnsupportedEncodingException
 	 * @throws MalformedURLException
@@ -202,7 +116,8 @@ public class VisitorClientImpl implements VisitorClient {
 					.getVisitorList("http://www.thomas-bayer.com:80/restnames/namesincountry.groovy?country=U.S.A.89454");
 			VisitorInfoBean visitorInfo = visitorClient
 					.getVisitorInfo("http://www.thomas-bayer.com:80/restnames/name.groovy?name=Lorraineasdfs ");
-			System.out.println(countryList + " " + visitorInfo + " " + visitorList);
+			System.out.println(countryList + " " + visitorInfo + " "
+					+ visitorList);
 		} catch (DataFetchException ex) {
 			System.out.println(ex.getMessage());
 		}
@@ -211,13 +126,14 @@ public class VisitorClientImpl implements VisitorClient {
 
 	/**
 	 * Encode the url string into http url format.
+	 * 
 	 * @param urlStr
 	 * @return
 	 * @throws DataFetchException
 	 */
 	private String encodeURL(String urlStr) throws DataFetchException {
 		try {
-			logger.log(Level.INFO,"To encode string - " + urlStr);
+			logger.log(Level.INFO, "To encode string - " + urlStr);
 			URL url = new URL(urlStr);
 			URI uri = new URI(url.getProtocol(), url.getUserInfo(),
 					url.getHost(), url.getPort(), url.getPath(),
